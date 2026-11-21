@@ -4,7 +4,7 @@ const tools = @import("tools.zig");
 
 const TimedOutcome = union(enum) { timedout: void, finished: void };
 
-fn splice(io: std.Io, source: net.Stream, destination: net.Stream, tracker: *tools.Activity) void {
+fn splice(io: std.Io, source: net.Stream, destination: net.Stream, tracker: *tools.ActivityRacer) void {
     var read_buf: [4096]u8 = undefined;
     var write_buf: [4096]u8 = undefined;
 
@@ -43,7 +43,7 @@ fn splice(io: std.Io, source: net.Stream, destination: net.Stream, tracker: *too
     }
 }
 
-fn relay(io: std.Io, local: net.Stream, upstream: net.Stream, tracker: *tools.Activity) void {
+fn relay(io: std.Io, local: net.Stream, upstream: net.Stream, tracker: *tools.ActivityRacer) void {
     var group: std.Io.Group = .init;
     defer group.cancel(io);
 
@@ -65,10 +65,10 @@ fn handle(io: std.Io, local: net.Stream, target: net.IpAddress, timeout: std.Io.
     var select: std.Io.Select(TimedOutcome) = .init(io, &slots);
     defer select.cancelDiscard();
 
-    var tracker: tools.Activity = .{ .last_activity = std.Io.Timestamp.now(io, .awake) };
+    var tracker: tools.ActivityRacer = .{};
 
     select.concurrent(.finished, relay, .{ io, local, upstream, &tracker }) catch return;
-    select.concurrent(.timedout, tools.Activity.deadline, .{ &tracker, io, timeout }) catch return;
+    select.concurrent(.timedout, tools.ActivityRacer.deadline, .{ &tracker, io, timeout }) catch return;
 
     switch (select.await() catch return) {
         .finished => {},
