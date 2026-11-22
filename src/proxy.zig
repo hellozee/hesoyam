@@ -2,8 +2,6 @@ const std = @import("std");
 const net = std.Io.net;
 const tools = @import("tools.zig");
 
-const TimedOutcome = union(enum) { timedout: void, finished: void };
-
 fn splice(io: std.Io, source: net.Stream, destination: net.Stream, tracker: *tools.ActivityRacer) void {
     var read_buf: [4096]u8 = undefined;
     var write_buf: [4096]u8 = undefined;
@@ -52,6 +50,8 @@ fn relay(io: std.Io, local: net.Stream, upstream: net.Stream, tracker: *tools.Ac
     group.await(io) catch return {};
 }
 
+const TimedOutcome = union(enum) { timedout: void, finished: void };
+
 fn handle(io: std.Io, local: net.Stream, target: net.IpAddress, timeout: std.Io.Duration) void {
     defer local.close(io);
 
@@ -76,20 +76,21 @@ fn handle(io: std.Io, local: net.Stream, target: net.IpAddress, timeout: std.Io.
     }
 }
 
-pub fn serve(io: std.Io, options: tools.ProxyOptions) !void {
-    var server = try options.host.listen(io, .{
-        .reuse_address = true,
-    });
-
-    defer server.deinit(io);
-
+pub fn serve(io: std.Io, server: *net.Server, options: tools.ProxyOptions) void {
     var group: std.Io.Group = .init;
     defer group.cancel(io);
 
     while (true) {
-        const stream = try server.accept(io);
-        errdefer stream.close(io);
+        const stream = server.accept(io) catch |err| {
+            if (err != error.Canceled) {
+                std.debug.print("couldn't accept client\n", .{});
+            }
+            return;
+        };
 
-        try group.concurrent(io, handle, .{ io, stream, options.target, options.timeout });
+        group.concurrent(io, handle, .{ io, stream, options.target, options.timeout }) catch {
+            std.debug.print("something went wrong with handling client", .{});
+            stream.close(io);
+        };
     }
 }

@@ -38,7 +38,6 @@ pub const ActivityRacer = struct {
 };
 
 pub const ProxyOptions = struct {
-    host: std.Io.net.IpAddress,
     target: std.Io.net.IpAddress,
     timeout: std.Io.Duration,
 };
