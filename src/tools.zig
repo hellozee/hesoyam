@@ -42,6 +42,20 @@ pub const ProxyOptions = struct {
     timeout: std.Io.Duration,
 };
 
+pub const SpliceState = struct {
+    failure: ?anyerror = null,
+    bytes_transferred: usize = 0,
+};
+
+pub const ConnectionContext = struct {
+    racer: ActivityRacer = .{},
+
+    client_to_upstream: SpliceState = .{},
+    upstream_to_client: SpliceState = .{},
+
+    relay_failure: ?anyerror = null,
+};
+
 const expect = std.testing.expect;
 
 test "elapsed increases without activity" {
